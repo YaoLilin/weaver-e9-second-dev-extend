@@ -1,5 +1,5 @@
 
-# <center>泛微 E9 二次开发扩展 <br> Second-dev `Extend`</center>
+# <h1 align="center">泛微 E9 二次开发扩展 <br> Second-dev `Extend`</h1>
 这是一个针对泛微 E9 二次开发的增强套件，针对二次开发提供了一些增强和便捷功能。  
 
 注意：这些功能尚属于试验性功能，还未得到充分验证
