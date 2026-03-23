@@ -2,7 +2,23 @@
 # <h1 align="center">泛微 E9 二次开发扩展 <br> Second-dev `Extend`</h1>
 这是一个针对泛微 E9 二次开发的增强套件，针对二次开发提供了一些增强和便捷功能。  
 
-注意：这些功能尚属于试验性功能，还未得到充分验证
+注意：这些功能尚属于试验性功能，还未得到充分验证，我还在持续完善，敬请期待
+
+## 如何使用
+
+### 后端部署
+
+有两种方式：
+
+1. 将本项目中的 `weaver-seconddev-extend-1.0.0.jar` 部署到服务器中的 `ecology/WEB-INF/lib` 目录下，重启服务器后即可使用
+2. 下载本项目源码，将本项目打成 jar 包后部署到服务器中的 `ecology/WEB-INF/lib` 目录下，重启服务器后即可使用
+
+此外还需要引入一个公共类库的依赖，需下载此依赖的 jar 包，并部署到服务器中的 `ecology/WEB-INF/lib` 目录下，依赖地址：
+请查看本人的另一个项目 `weaver-e9-common`, https://gitee.com/yaolilin/weaver-e9-common
+
+### 前端部署
+
+将本项目下的 ecode 文件夹中的 ecode 应用（格式为zip）导入到系统中的 ecode 中，并发布
 
 ## 功能说明
 ### 流程 Action 参数增强
