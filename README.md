@@ -18,7 +18,16 @@
 
 ### 前端部署
 
-将本项目下的 ecode 文件夹中的 ecode 应用（格式为zip）导入到系统中的 ecode 中，并发布
+将本项目下的 ecode 文件夹中的 ecode 应用（格式为zip）导入到系统中的 ecode 中，并发布。
+
+#### 后端菜单配置
+
+需要在后端门户引擎中添加后端菜单，菜单地址：
+`/spa/custom/static/index.html#/main/cs/app/494a669f59304c6dae317a190d8159a3_Index`  
+菜单名称为：接口集成  
+之后就能通过该菜单进入配置页面，配置接口与参数映射
+
+![img.png](images/img_6.png)
 
 ## 功能说明
 ### 流程 Action 参数增强
