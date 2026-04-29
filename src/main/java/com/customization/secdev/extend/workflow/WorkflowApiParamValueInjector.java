@@ -3,18 +3,20 @@ package com.customization.secdev.extend.workflow;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.customization.secdev.extend.api.param.ApiParamValueInjector;
+import com.customization.yll.common.RecordSetFactory;
+import com.customization.yll.common.exception.ConfigurationException;
 import com.customization.yll.common.workflow.WorkflowFieldValueManager;
 import com.customization.yll.common.workflow.anotations.ActionParam;
 import com.customization.yll.common.workflow.interfaces.WorkflowFieldValueFetchInterface;
-import com.engine.interfaces.secdev.extend.workflow.domain.dto.WorkflowActionAdvanceParamDTO;
-import com.engine.interfaces.secdev.extend.workflow.domain.dto.WorkflowFieldValue;
 import com.engine.interfaces.secdev.extend.api.domain.dto.Assignment;
-import com.engine.interfaces.secdev.extend.api.domain.vo.AssignmentValue;
-import com.engine.interfaces.secdev.extend.workflow.service.impl.WorkflowActionParamConfigServiceImpl;
 import com.engine.interfaces.secdev.extend.api.domain.enums.AssignmentMethod;
 import com.engine.interfaces.secdev.extend.api.domain.enums.SystemParamEnum;
-import com.customization.yll.common.RecordSetFactory;
+import com.engine.interfaces.secdev.extend.api.domain.vo.AssignmentValue;
+import com.engine.interfaces.secdev.extend.workflow.dao.WorkflowActionParamConfigDao;
+import com.engine.interfaces.secdev.extend.workflow.domain.dto.WorkflowActionAdvanceParamDTO;
+import com.engine.interfaces.secdev.extend.workflow.domain.dto.WorkflowFieldValue;
 import com.engine.interfaces.secdev.extend.workflow.service.WorkflowActionParamConfigService;
+import com.engine.interfaces.secdev.extend.workflow.service.impl.WorkflowActionParamConfigServiceImpl;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -31,7 +33,7 @@ import java.util.Map;
  * @desc Workflow Action 参数注入器, 根据在流程 Action 配置的参数赋值，对 Action 高级参数对象内的属性进行赋值。<br>
  * <p>参数识别规则
  * <ul>
- *     <li>字段类型为基本类型或 List (元素类型为基本类型) ，可以不使用 {@link ActionParam} 注解，可被作为 Action 参数></li>
+ *     <li>字段类型为基本类型或 List (元素类型为基本类型) ，可以不使用 {@link ActionParam} 注解，可被作为 Action 参数</li>
  *     <li>对于参数对象内的内嵌对象，以及 List 的元素类型为基本类型之外的类型，必需使用 {@link ActionParam} 注解 才可被认为是 Action 参数</li>
  *     <li>可识别参数对象的父类，嵌套对象，List 对象内的属性字段作为 Action 参数 </li>
  * </ul>
@@ -42,8 +44,8 @@ import java.util.Map;
  *  <ul>
  *      <li>如果字段类型为 List<Integer> ,获取的值为字符串且包含逗号，如：1,2,3 ，将会对字符串进行拆分转为 List</li>
  *      <li>如果字段类型为 List ,元素类型不为 Integer，且为基本类型，则将获取到的值生成一个元素，存入 List</li>
- *      <li>如果字段类型为 List ,对于元素对象内的字段，如果在前端 Action 参数配置中该 List 配置了明细表，List 下的参数的赋值
- *      选择明细表字段，则按每一条明细数据生成一个 List 元素对象，并获取明细字段值存入 List 中</li>
+ *      <li>如果字段类型为 List ,元素类型为基本类型之外的对象，则对对象内的属性进行赋值，如果在前端 Action 参数配置中该 List 配置了明细表，
+ *      List 下的参数的赋值选择明细表字段，则按每一条明细数据生成一个 List 元素对象，并获取明细字段值存入 List 中</li>
  *      <li>如果字段类型不为 List，赋值配置中选择了明细表字段，则将获取所有行的明细字段值，使用逗号拼接成字符串进行赋值</li>
  *  </ul>
  * @date 2026/1/15
@@ -143,7 +145,7 @@ public class WorkflowApiParamValueInjector implements ApiParamValueInjector {
                 Object value = resolveSimpleValue(fieldType, node, requestId, detailRow, detailTableNum);
                 if (value != null || fieldType.isPrimitive()) {
                     field.set(target, value);
-                    hasValue = value != null || fieldType.isPrimitive();
+                    hasValue = true;
                 }
                 continue;
             }
@@ -218,22 +220,34 @@ public class WorkflowApiParamValueInjector implements ApiParamValueInjector {
 
     private List<?> resolveObjectListValue(Class<?> elementType, ConfigNode node, int requestId,
                                            Map<String, ConfigNode> configMap, String fieldPath) throws IllegalAccessException {
-        if (node.detailTable == null || node.detailTable <= 0) {
-            throw new IllegalArgumentException("数组参数未配置明细表，参数：" + node.name);
+        List<Map<String, String>> detailRows = new ArrayList<>();
+
+        if (node.detailTable != null) {
+            if (node.detailTable < 1) {
+                throw new ConfigurationException("明细表序号必须大于0，配置错误，字段路径：" + fieldPath);
+            }
+            List<String> detailFieldNames = collectDetailFieldNames(configMap, fieldPath, node.detailTable);
+            detailRows = workflowFieldValueManager.getDetailFields(requestId, node.detailTable, detailFieldNames);
         }
-        List<String> detailFieldNames = collectDetailFieldNames(configMap, fieldPath, node.detailTable);
-        if (CollUtil.isEmpty(detailFieldNames)) {
-            return new ArrayList<>();
-        }
-        List<Map<String, String>> detailRows = workflowFieldValueManager.getDetailFields(requestId, node.detailTable, detailFieldNames);
+
         List<Object> result = new ArrayList<>();
-        for (Map<String, String> row : detailRows) {
+        if (CollUtil.isEmpty(detailRows)) {
             Object element = createInstance(elementType);
-            boolean hasValue = injectObjectFields(element, elementType, fieldPath, configMap, requestId, row, node.detailTable);
+            boolean hasValue = injectObjectFields(element, elementType, fieldPath, configMap, requestId,
+                    null, node.detailTable);
             if (hasValue) {
                 result.add(element);
             }
+        } else {
+            for (Map<String, String> row : detailRows) {
+                Object element = createInstance(elementType);
+                boolean hasValue = injectObjectFields(element, elementType, fieldPath, configMap, requestId, row, node.detailTable);
+                if (hasValue) {
+                    result.add(element);
+                }
+            }
         }
+
         return result;
     }
 
