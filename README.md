@@ -4,7 +4,7 @@
 
 注意：这些功能尚属于试验性功能，还未得到充分验证，我还在持续完善，敬请期待
 
-## 如何使用
+## 如何使用 👈
 
 ### 后端部署
 
@@ -75,6 +75,34 @@ public class TestAction3 extends AbstractWorkflowAction {
 ![img_1.png](images/img_1.png)  
 
 ![img_2.png](images/img_2.png)  
+
+在 Action 类中使用参数:
+
+```java
+public class TestAction extends AbstractExtendWorkflowAction<TestActionParam> {
+
+    @ActionParam(required = true, desc = "Action 标识")
+    private String actionId;
+
+    @Override
+    protected ActionResult doExecute(RequestInfo requestInfo, TestActionParam param) {
+        // 使用参数，参数中的属性的值会根据前端的配置自动注入
+        String name1 = param.getName();
+        return new ActionResult(true, "执行成功");
+    }
+
+    @Override
+    protected String getActionId() {
+        return actionId;
+    }
+
+    @Override
+    public Class<TestActionParam> getParamType() {
+        return TestActionParam.class;
+    }
+}
+
+```
 
 #### 如何使用
 在后端中 Action 创建时需要继承 `AbstractExtendWorkflowAction` 类，并实现方法，该类的范型参数为 Action 传入的
@@ -183,6 +211,46 @@ header:{test=2026-01-08, name=项目1, id=1}
 body:{"data":{"number":"1,2,3,4","name":"供应商xx","id":684684,"detail":[{"num":"1"},{"num":"2"},{"num":"3"},{"num":"4"}],"done":false}}
 ```
 
+## 实现原理
+
+### 流程 Action 参数自动获取
+
+通过传入 Action 的类路径，获取到 class 对象，通过反射来获取到类里面的成员，识别为 Action 参数，并获取成员上的
+@ActionParam 注解信息来获取参数的描述、是否必填等信息，最后将参数信息返回给前端
+
+### 流程 Action 高级参数配置
+
+#### 参数获取
+
+1. 通过反射，获取 Action 类中的 `getParamType()` 方法，来获取参数的类型
+2. 通过反射，获取到参数类型中的成员，以及嵌套的成员对象，获取成员中的 @ActionParam 注解信息来获取参数的描述、是否必填等信息，
+   然后生成 `List<WorkflowActionAdvanceParamDTO>` 对象，该对象中存储了所有的参数数据
+3. 获取数据库表中的参数赋值信息，将参数赋值信息合并到 `List<WorkflowActionAdvanceParamDTO>` 对象中
+4. 将参数信息返回给前端，前端根据参数信息来展示参数配置，生成 JSON 形式的参数配置
+
+#### 参数值注入
+
+在前端配置了 Action 参数的值，在执行 Action 时，可根据配置的参数赋值，对 Action 参数对象中的属性进行赋值
+
+原理：
+
+1. 在 `AbstractExtendWorkflowAction` 中，通过 `getParamType()` 方法获取参数类型，通过 `ApiParamValueInjector`
+   对参数对象进行属性值注入
+2. 在 `ApiParamValueInjector` 中，对参数对象中的属性进行递归处理，根据前端配置的参数赋值规则，来获取到参数值，并通过
+   反射将值赋值到属性中
+3. 在对参数对象属性值注入的过程中，会根据属性的类型，以及前端配置的赋值，来对赋值进行处理，比如
+   如果字段类型为 List<Integer> ,获取的值为字符串且包含逗号，如：1,2,3 ，将会对字符串进行拆分转为 List
+
+#### 接口参数生成
+
+在前端配置好接口参数以及赋值规则，在后端就能生成接口的参数，比如请求头参数，请求体（JSON）参数
+
+原理：
+
+1. 后端通过 `ApiParamGenerator` 接口来生成接口参数
+2. 在 `ApiParamGeneratorImpl` 实现类中，获取保存到数据库中的接口参数配置，遍历和递归接口参数，根据配置的参数类型来
+   生成接口参数类型，比如 List、Object、String
+3. 根据赋值规则来获取参数值，比如从流程表单字段中获取值，或者固定值
 
 
 
