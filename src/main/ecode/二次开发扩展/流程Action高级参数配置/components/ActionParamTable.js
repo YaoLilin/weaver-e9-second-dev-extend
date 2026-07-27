@@ -10,6 +10,9 @@ const PropTypes = window.PropTypes;
  *     onChange: (data) => {},
  *     actionPath?: string,
  * }
+ *
+ * Action 高级参数配置表格，支持 json 格式的参数配置，可对参数进行动态赋值，可取流程表单字段值。
+ * @author yaolilin
  */
 class ActionParamTable extends React.Component {
     constructor(props) {
@@ -35,6 +38,10 @@ class ActionParamTable extends React.Component {
         if (!window.workflowActionConfigStore) {
             return;
         }
+        if (window.workflowActionConfigStore.actionId) {
+            this.actionId = window.workflowActionConfigStore.actionId;
+        }
+
         window.workflowActionConfigStore.onActionIdChange = (actionId) => {
             if (this.actionId !== actionId) {
                 this.actionId = actionId;
@@ -69,6 +76,11 @@ class ActionParamTable extends React.Component {
             return [];
         }
         return backendData.map(item => {
+            // 公共 ParametersMapperTable 的明细表列使用 detailNum，
+            // 后端接口返回 detailTable，加载时同步字段以便选择框正确回显。
+            const detailTable = item.detailTable !== undefined && item.detailTable !== null
+                ? item.detailTable
+                : null;
             const converted = {
                 id: item.id ? item.id.toString() : this.generateParamId(),
                 name: item.name || '',
@@ -76,7 +88,8 @@ class ActionParamTable extends React.Component {
                 type: item.type !== undefined ? (typeof item.type === 'object' ? item.type.value : item.type) : 0,
                 required: item.required !== undefined ? (item.required === true || item.required === 1) : false,
                 assignment: item.assignment,
-                detailTable: item.detailTable !== undefined && item.detailTable !== null ? item.detailTable : null,
+                detailTable: detailTable,
+                detailNum: detailTable,
                 desc: item.desc || ''
             };
             if (isRootLevel && converted.name === 'actionId' && this.actionId) {

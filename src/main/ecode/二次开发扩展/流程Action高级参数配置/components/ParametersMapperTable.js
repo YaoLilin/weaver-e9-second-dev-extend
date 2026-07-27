@@ -16,7 +16,10 @@ const PropTypes = window.PropTypes;
  *     data: [],
  *     onChange: (data) => {},
  * }
- * 支持配置 JSON 参数结构，并支持字段映射（赋值方式/取值）。
+ *
+ * Action 高级参数配置表格，支持 json 格式的参数配置，可对参数进行动态赋值，可取流程表单字段值。
+ *
+ * @author yaolilin
  */
 class ParametersMapperTable extends React.Component {
 

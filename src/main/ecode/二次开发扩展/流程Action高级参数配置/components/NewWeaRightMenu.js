@@ -2,7 +2,10 @@ const {WeaRightMenu} = ecCom;
 const {Button} = antd;
 const ActionParamTable = ecodeSDK.imp(ActionParamTable);
 
-
+/**
+ * 流程 Action 配置表单组件，添加高级 Action 参数配置表格
+ * @author yaolilin
+ */
 class NewWeaRightMenu extends React.Component {
 
     constructor( props) {
@@ -46,7 +49,9 @@ class NewWeaRightMenu extends React.Component {
                 <ActionParamTable
                     data={paramData}
                     onChange={newData => this.setState({paramData:newData})}
+                    dataSource={this.props.dataSource}
                     workflowId={this.props.workflowId}
+                    modeId={this.props.modeId}
                     actionPath={this.props.actionPath}
                 />
             </div>
