@@ -4,10 +4,17 @@ import cn.hutool.core.util.StrUtil;
 import com.customization.secdev.extend.api.param.ApiParamValueInjector;
 import com.customization.yll.common.exception.ActionConfigException;
 import com.customization.yll.common.workflow.AbstractWorkflowAction;
+import com.customization.yll.common.workflow.anotations.ActionParam;
 import com.customization.yll.common.workflow.bean.ActionResult;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import weaver.soa.workflow.request.RequestInfo;
+
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.IdentityHashMap;
+import java.util.List;
 
 /**
  * @author 姚礼林
@@ -34,7 +41,82 @@ public abstract class AbstractExtendWorkflowAction<T> extends AbstractWorkflowAc
             throw new ActionConfigException("ActionId 为空，请传入 ActionId");
         }
         T param = paramInjector.injectParam(paramType, Integer.parseInt(requestInfo.getRequestid()), actionId );
+        verifyRequiredParams(param);
         return doExecute(requestInfo, param);
+    }
+
+    /**
+     * 校验高级 Action 参数对象中标记为必填的属性。
+     * 嵌套对象及 List 中的对象会继续校验；未标记 {@link ActionParam} 的属性不参与校验。
+     *
+     * @param param 注入后的 Action 参数
+     */
+    private void verifyRequiredParams(T param) {
+        verifyRequiredParams(param, "", new IdentityHashMap<>());
+    }
+
+    private void verifyRequiredParams(Object param, String path, IdentityHashMap<Object, Boolean> visited) {
+        if (param == null || isSimpleValue(param)) {
+            return;
+        }
+        if (visited.put(param, Boolean.TRUE) != null) {
+            return;
+        }
+        if (param instanceof List) {
+            List<?> values = (List<?>) param;
+            for (int index = 0; index < values.size(); index++) {
+                verifyRequiredParams(values.get(index), path + "[" + index + "]", visited);
+            }
+            return;
+        }
+        if (param.getClass().isArray()) {
+            int length = Array.getLength(param);
+            for (int index = 0; index < length; index++) {
+                verifyRequiredParams(Array.get(param, index), path + "[" + index + "]", visited);
+            }
+            return;
+        }
+
+        for (Class<?> clazz = param.getClass(); clazz != null && clazz != Object.class; clazz = clazz.getSuperclass()) {
+            for (Field field : clazz.getDeclaredFields()) {
+                if (field.isSynthetic() || Modifier.isStatic(field.getModifiers())
+                        || !field.isAnnotationPresent(ActionParam.class)) {
+                    continue;
+                }
+                ActionParam actionParam = field.getAnnotation(ActionParam.class);
+                String fieldPath = StrUtil.isEmpty(path) ? field.getName() : path + "." + field.getName();
+                Object value = getFieldValue(param, field, fieldPath);
+                if (actionParam.required() && isEmptyRequiredValue(value)) {
+                    throw new ActionConfigException(String.format("Action 参数不正确，[%s] 参数必填，请检查 Action 参数配置", fieldPath));
+                }
+                if (value != null) {
+                    verifyRequiredParams(value, fieldPath, visited);
+                }
+            }
+        }
+    }
+
+    private Object getFieldValue(Object param, Field field, String fieldPath) {
+        try {
+            field.setAccessible(true);
+            return field.get(param);
+        } catch (IllegalAccessException e) {
+            throw new ActionConfigException(String.format("Action 参数校验异常，无法读取参数 [%s]", fieldPath));
+        }
+    }
+
+    private boolean isEmptyRequiredValue(Object value) {
+        return value == null || (value instanceof String && StrUtil.isBlank((String) value));
+    }
+
+    private boolean isSimpleValue(Object value) {
+        Class<?> type = value.getClass();
+        if (value instanceof List || type.isArray()) {
+            return false;
+        }
+        return value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character
+                || type.isEnum() || type.isPrimitive() || (type.getPackage() != null
+                && type.getPackage().getName().startsWith("java."));
     }
 
     /**
